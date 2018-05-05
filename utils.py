@@ -1,4 +1,11 @@
-# coding=utf-8
+# coding='utf-8'
+'''
+    An re-implementation of MobileNet_V2
+    author: Youzhao Yang
+    date: 05/01/2018
+    github: https://github.com/nnuyi
+'''
+
 import random
 import numpy as np
 import cifar10
