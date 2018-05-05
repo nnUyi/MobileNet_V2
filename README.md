@@ -17,14 +17,15 @@
   - cPickle
   - Pillow
   
+  **Notes**: if you have python with 3.* version, cifar10.py should be replaced by [Hvass-Labs's codes](https://github.com/Hvass-Labs/TensorFlow-Tutorials) and do little adjustments. Any problems, you can email me!!!
+  
 # Repo Structure
   The following structure show the main frame of this repo.
   
 ```text
   MobileNet_V2
-  |———— data                                  # store cifar10 dataset
-          |———— cifar10
-                  |———— cifar-10-batches-py
+  |———— data/                                 # store cifar10 dataset
+          |———— cifar10/
   |———— main.py                               # repo entry
   |———— MobileNet_V2.py                       # mobilenet class
   |———— utils.py                              # generate datasource
@@ -90,6 +91,10 @@
   - Continute to fine-tuning hyperparameters to improve its accuracy!!!
   - Train in cifar100
   - Train in Caltech101
+
+# References
+  - [MobileNetV2: Inverted Residuals and Linear Bottlenecks](https://arxiv.org/pdf/1801.04381.pdf)
+  - cifar10.py is derived from [Hvass-Labs's codes](https://github.com/Hvass-Labs/TensorFlow-Tutorials)
 
 # Contact
   Email: computerscienceyyz@163.com
