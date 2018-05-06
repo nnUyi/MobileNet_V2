@@ -82,7 +82,7 @@
                        --num_class=10
 
 ## Results
-  - After training, you can see that the testing accuracy rate can reach to about **86.7%**.
+  - After training, you can see that the testing accuracy rate can reach to about **88.7%**.
   - loss function shows below:
     
     <p align='center'><img src='./figure/loss_function.png'/></p>
