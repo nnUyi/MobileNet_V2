@@ -43,12 +43,12 @@ def get_data(data_type='mnist', is_training=True):
 
 def gen_data(datasource, is_training=True):
     while True:
-        indices = range(len(datasource.images))
+        indices = list(range(len(datasource.images)))
         random.shuffle(indices)
         if is_training:
             for i in indices:
                 image = pre_process(datasource.images[i])
-                # image = datasource.images[i]
+                #image = datasource.images[i]
                 label = datasource.labels[i]
                 yield image, label
         else:
@@ -78,21 +78,25 @@ def data_augment(image):
         image = Image.fromarray(np.uint8(image*255))
 
     def distort_color(image):
-        random_factor = np.random.randint(0, 31) / 10.  # 随机因子
-        color_image = ImageEnhance.Color(image).enhance(random_factor)  # 调整图像的饱和度
-        random_factor = np.random.randint(10, 21) / 10.  # 随机因子
-        brightness_image = ImageEnhance.Brightness(color_image).enhance(random_factor)  # 调整图像的亮度
-        random_factor = np.random.randint(10, 21) / 10.  # 随机因1子
-        contrast_image = ImageEnhance.Contrast(brightness_image).enhance(random_factor)  # 调整图像对比度
-        random_factor = np.random.randint(0, 31) / 10.  # 随机因子
-        sharpness_image = ImageEnhance.Sharpness(contrast_image).enhance(random_factor)  # 调整图像锐度
+        # saturation
+        random_factor = np.random.randint(0, 31) / 10.
+        color_image = ImageEnhance.Color(image).enhance(random_factor)
+        # brightness
+        random_factor = np.random.randint(10, 21) / 10.
+        brightness_image = ImageEnhance.Brightness(color_image).enhance(random_factor)
+        # contrast
+        random_factor = np.random.randint(10, 21) / 10.
+        contrast_image = ImageEnhance.Contrast(brightness_image).enhance(random_factor)
+        # sharpness
+        random_factor = np.random.randint(0, 31) / 10.
+        sharpness_image = ImageEnhance.Sharpness(contrast_image).enhance(random_factor)
         return sharpness_image
 
     def distort(image):
         distort_image = image
-
+        
         # random rotate: angle range from 1 degree to 45 degree
-        random_angle = np.random.randint(0,46)
+        random_angle = np.random.randint(0,15)
         distort_image = image.rotate(random_angle, Image.BICUBIC)
 
         # random flip
@@ -103,7 +107,7 @@ def data_augment(image):
             distort_image = distort_image.transpose(Image.FLIP_TOP_BOTTOM)
         else:
             pass
-
+        '''
         # random center crop
         random_scale = np.random.uniform(0.8,1)
         width, height = distort_image.size[0], distort_image.size[1]
@@ -114,7 +118,7 @@ def data_augment(image):
         distort_image = distort_image.crop(bounding_box)
         # resize to original size
         distort_image = distort_image.resize((width, height))
-
+        '''
         # color jittering
         if is_colorful:
             distort_image = distort_color(distort_image)
