@@ -42,7 +42,7 @@
 ## Datasets
   In this repo, since the computation, I mainly focus on ***CIFAR10*** datasets.
   
-  - **CIFAR10:** You are required to download *CIFAR10* datasets [here](https://www.cs.toronto.edu/~kriz/cifar.html), unzip it and store it in ***'./data/cifar10/'***, note that **CIFAR-10 python version** is required. You can unzip it in ***'./data/cifar10/'*** using the following command:
+  - **CIFAR10:** You are required to download *CIFAR10* datasets [here](https://www.cs.toronto.edu/~kriz/cifar.html), unzip it and store it in ***'./data/cifar10/'*** , note that **CIFAR-10 python version** is required. You can unzip it in ***'./data/cifar10/'*** using the following command:
   
         $ tar -zxvf cifar-10-python.tar.gz
         # you will see that data_batch_* are stored in './data/cifar10/cifar-10-batches-py/'
@@ -82,7 +82,7 @@
                        --num_class=10
 
 ## Results
-  - After training, you can see that the testing accuracy rate can reach to about **89.0%**.
+  - After training, you can see that the testing accuracy rate can reach to **89.0%**.
   - loss function shows below:
     
     <p align='center'><img src='./figure/loss_function.png'/></p>
