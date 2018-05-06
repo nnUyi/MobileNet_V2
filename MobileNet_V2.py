@@ -13,7 +13,7 @@ import os
 import numpy as np
 
 from tqdm import tqdm
-from utils import *
+from utils_1 import *
 
 class MobileNet_V2:
     '''
@@ -36,13 +36,13 @@ class MobileNet_V2:
     def inverted_bottleneck_block(self, input_x, channel_up_factor, output_channel, subsample, is_training=True):
         self.num_block = self.num_block + 1
         scope='inverted_bottleneck{}_{}_{}'.format(self.num_block, channel_up_factor, subsample)
-        bn_parameters = {'is_training': is_training, 'center':True, 'scale':True, 'decay':0.99, 'epsilon':0.001, 'zero_debias_moving_mean':False}
+        # bn_parameters = {'is_training': is_training, 'center':True, 'scale':True, 'decay':0.99, 'epsilon':0.001, 'zero_debias_moving_mean':False}
         
         with tf.variable_scope(scope) as scope:
             with slim.arg_scope([slim.conv2d, slim.separable_conv2d],
                                 weights_initializer=tf.truncated_normal_initializer(stddev=0.02),
                                 normalizer_fn=slim.batch_norm,
-                                normalizer_params=bn_parameters,
+                                #normalizer_params=bn_parameters,
                                 activation_fn=tf.nn.relu6):
                 # set stride
                 stride = 2 if subsample else 1
@@ -60,12 +60,10 @@ class MobileNet_V2:
                 # normal residual
                 if is_residual:
                     output = input_x + depth_wise_ops
-                    
                 # if the numbers of channel of the input and output don't matching, conv2d_1*1 is required
                 elif stride == 1 and is_conv_res:
                     output_channel = depth_wise_ops.get_shape().as_list()[-1]
                     output = slim.conv2d(input_x, output_channel, 1, 1, activation_fn=None) + depth_wise_ops
-                    
                 else:
                     output = depth_wise_ops
 
@@ -73,7 +71,7 @@ class MobileNet_V2:
 
     def mobilenet_v2(self, input_x, is_training=True, reuse=False, keep_prob=0.5, scope='mobilenet_v2'):
         # batch_norm parameters
-        bn_parameters = {'is_training': is_training, 'center':True, 'scale':True, 'decay':0.99, 'epsilon':0.001, 'zero_debias_moving_mean':False}
+        # bn_parameters = {'is_training': is_training, 'center':True, 'scale':True, 'decay':0.99, 'epsilon':0.001, 'zero_debias_moving_mean':False}
         
         self.num_block = 0
         with tf.variable_scope(scope) as scope:
@@ -81,14 +79,15 @@ class MobileNet_V2:
                 scope.reuse_variables()
             conv0 = slim.conv2d(input_x, 32, 3, stride=1, activation_fn=tf.nn.relu6,
                                                           normalizer_fn=slim.batch_norm,
-                                                          normalizer_params=bn_parameters,
+                                                          #normalizer_params=bn_parameters,
                                                           weights_initializer=tf.truncated_normal_initializer(stddev=0.02),
                                                           scope='conv0')
             # dropout
-            dropout0 = slim.dropout(conv0, keep_prob = keep_prob)
+            # dropout0 = slim.dropout(conv0, keep_prob = keep_prob)
+            # conv0_act = tf.nn.relu6(dropout0)
             
             # bottleneck_residual_block
-            bottleneck_1_1 = self.inverted_bottleneck_block(dropout0, 1, 16, False, is_training=is_training)
+            bottleneck_1_1 = self.inverted_bottleneck_block(conv0, 1, 16, False, is_training=is_training)
             bottleneck_2_1 = self.inverted_bottleneck_block(bottleneck_1_1, 6, 24, False, is_training=is_training)
             bottleneck_2_2 = self.inverted_bottleneck_block(bottleneck_2_1, 6, 24, False, is_training=is_training)
             bottleneck_3_1 = self.inverted_bottleneck_block(bottleneck_2_2, 6, 32, True, is_training=is_training)
@@ -108,16 +107,19 @@ class MobileNet_V2:
             
             conv8 = slim.conv2d(bottleneck_7_1, 1280, 3, stride=1, activation_fn=tf.nn.relu6,
                                                                    normalizer_fn=slim.batch_norm,
-                                                                   normalizer_params=bn_parameters,
+                                                                   #normalizer_params=bn_parameters,
                                                                    weights_initializer=tf.truncated_normal_initializer(stddev=0.02),
                                                                    scope='conv8')
-            # global average pooling
-            dropout1 = slim.dropout(conv8, keep_prob=keep_prob)
-            filter_size = [dropout1.get_shape().as_list()[1], dropout1.get_shape().as_list()[2]]
-            avgpool = slim.avg_pool2d(dropout1, filter_size, scope='avgpool')
-            dropout2 = slim.dropout(avgpool, keep_prob=keep_prob)
+            # dropout1 = slim.dropout(conv8, keep_prob=keep_prob)
+            # conv8_act = tf.nn.relu6(dropout1)
             
-            output = tf.squeeze(slim.conv2d(dropout2, self.num_class, 1, stride=1, activation_fn=None,
+            # global average pooling
+            # dropout2 = slim.dropout(conv8, keep_prob=keep_prob)
+            filter_size = [conv8.get_shape().as_list()[1], conv8.get_shape().as_list()[2]]
+            avgpool = slim.avg_pool2d(conv8, filter_size, scope='avgpool')
+            dropout3 = slim.dropout(avgpool, keep_prob=keep_prob)
+            
+            output = tf.squeeze(slim.conv2d(dropout3, self.num_class, 1, stride=1, activation_fn=None,
                                                                                    weights_initializer=tf.truncated_normal_initializer(stddev=0.02)))
             return output
             
@@ -130,7 +132,7 @@ class MobileNet_V2:
         self.learning_rate = tf.placeholder(tf.float32, shape=None, name='learning_rate')
         
         # mobilenet_v2 forward
-        self.train_logits = self.mobilenet_v2(self.input_x, is_training=True, reuse=False, keep_prob=0.8)
+        self.train_logits = self.mobilenet_v2(self.input_x, is_training=True, reuse=False, keep_prob=0.5)
         
         # predicted softmax
         self.test_logits = self.mobilenet_v2(self.input_x, is_training=True, reuse=True, keep_prob=1)
@@ -196,7 +198,7 @@ class MobileNet_V2:
             
             if np.mod(ite, ites_per_epoch) == 0:
                 # learning rate decay
-                learning_rate = learning_rate*self.config.learning_rate_decay
+                # learning_rate = learning_rate*self.config.learning_rate_decay
                 self.test_model()
                 '''
                 pred_softmax = self.pred_softmax.eval({self.input_x:images, self.input_label:labels})
@@ -241,7 +243,7 @@ class MobileNet_V2:
         datasource = get_data(self.config.dataset, is_training=False)        
         gen_data = gen_batch_data(datasource, self.batchsize, is_training=False)
         
-        ites = len(datasource.images)/self.batchsize
+        ites = int(len(datasource.images)/self.batchsize)
         correct_num = 0
         for ite in range(ites):
             images, labels = next(gen_data)
