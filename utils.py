@@ -47,8 +47,8 @@ def gen_data(datasource, is_training=True):
         random.shuffle(indices)
         if is_training:
             for i in indices:
-                # image = pre_process(datasource.images[i])
-                image = datasource.images[i]
+                image = pre_process(datasource.images[i])
+                # image = datasource.images[i]
                 label = datasource.labels[i]
                 yield image, label
         else:
@@ -90,13 +90,13 @@ def data_augment(image):
 
     def distort(image):
         distort_image = image
-        '''
+
         # random rotate: angle range from 1 degree to 45 degree
         random_angle = np.random.randint(0,46)
         distort_image = image.rotate(random_angle, Image.BICUBIC)
 
         # random flip
-        random_flip = np.random.randint(0,2)
+        random_flip = np.random.randint(0,3)
         if random_flip == 0:
             distort_image = distort_image.transpose(Image.FLIP_LEFT_RIGHT)
         elif random_flip == 1:
@@ -114,10 +114,10 @@ def data_augment(image):
         distort_image = distort_image.crop(bounding_box)
         # resize to original size
         distort_image = distort_image.resize((width, height))
-        '''
+
         # color jittering
-        #if is_colorful:
-        #    distort_image = distort_color(distort_image)
+        if is_colorful:
+            distort_image = distort_color(distort_image)
 
         return distort_image
 
