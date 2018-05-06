@@ -15,7 +15,7 @@ flags = tf.app.flags
 flags.DEFINE_integer('input_height', 224, 'input image height')
 flags.DEFINE_integer('input_width', 224, 'input image width')
 flags.DEFINE_integer('input_channel', 3, 'input image channel')
-flags.DEFINE_integer('batchsize', 96, 'training batchsize')
+flags.DEFINE_integer('batchsize', 128, 'training batchsize')
 flags.DEFINE_integer('iterations', 150000, 'training epoches')
 flags.DEFINE_integer('num_class', 101, 'numbers of classes')
 flags.DEFINE_float('learning_rate', 0.0001, 'training rate')
