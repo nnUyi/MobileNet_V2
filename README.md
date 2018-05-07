@@ -32,6 +32,9 @@
   |———— cifar10.py                            # cifar10.py, cache.py dataset.py  for cifar10 reading
   |———— cache.py
   |———— datatset.py
+  
+  # if you want to use your own datasets, add your datasets type in line 38 in utils.py. 
+  # Images are [input_height, input_width, input_channel] formats and labels are one_hot encoding formats.
 ```
 
 # Usages
