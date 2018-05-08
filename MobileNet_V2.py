@@ -27,8 +27,11 @@ class MobileNet_V2:
         self.input_width = config.input_width
         self.input_channel = config.input_channel
         self.num_class = config.num_class
+        
         # training params
         self.batchsize = config.batchsize
+        self.width_multiplier = 6
+        
         # configuration
         self.config = config
         self.sess = sess
@@ -36,92 +39,81 @@ class MobileNet_V2:
     def inverted_bottleneck_block(self, input_x, channel_up_factor, output_channel, subsample, is_training=True):
         self.num_block = self.num_block + 1
         scope='inverted_bottleneck{}_{}_{}'.format(self.num_block, channel_up_factor, subsample)
-        # bn_parameters = {'is_training': is_training, 'center':True, 'scale':True, 'decay':0.99, 'epsilon':0.001, 'zero_debias_moving_mean':False}
         
         with tf.variable_scope(scope) as scope:
-            with slim.arg_scope([slim.conv2d, slim.separable_conv2d],
-                                weights_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                normalizer_fn=slim.batch_norm,
-                                #normalizer_params=bn_parameters,
-                                activation_fn=tf.nn.relu6):
-                # set stride
-                stride = 2 if subsample else 1
-                # get numbers of input channel
-                input_channel = input_x.get_shape().as_list()[-1]
+            # set stride
+            stride = 2 if subsample else 1
+            # get numbers of input channel
+            input_channel = input_x.get_shape().as_list()[-1]
+            
+            channel_up_ops = slim.conv2d(input_x, channel_up_factor*input_channel, 1, 1)
+            separable_ops = slim.separable_conv2d(channel_up_ops, None, 3, depth_multiplier=1, stride=stride)
+            depth_wise_ops = slim.conv2d(separable_ops, output_channel, 1, 1, activation_fn=None)
+            
+            # residual add if input_channel == output_channel
+            is_conv_res = False if depth_wise_ops.get_shape().as_list()[-1] == input_channel else True
+            is_residual = True if depth_wise_ops.get_shape().as_list()[-1] == input_channel else False
+            
+            # normal residual
+            if is_residual:
+                output = input_x + depth_wise_ops
                 
-                channel_up_ops = slim.conv2d(input_x, channel_up_factor*input_channel, 1, 1)
-                separable_ops = slim.separable_conv2d(channel_up_ops, None, 3, depth_multiplier=1, stride=stride)
-                depth_wise_ops = slim.conv2d(separable_ops, output_channel, 1, 1, activation_fn=None)
+            # if the numbers of channel of the input and output don't matching, conv2d_1*1 is required
+            elif stride == 1 and is_conv_res:
+                output_channel = depth_wise_ops.get_shape().as_list()[-1]
+                output = slim.conv2d(input_x, output_channel, 1, 1, activation_fn=None) + depth_wise_ops
                 
-                # residual add if input_channel == output_channel
-                is_conv_res = False if depth_wise_ops.get_shape().as_list()[-1] == input_channel else True
-                is_residual = True if depth_wise_ops.get_shape().as_list()[-1] == input_channel else False
-                
-                # normal residual
-                if is_residual:
-                    output = input_x + depth_wise_ops
-                # if the numbers of channel of the input and output don't matching, conv2d_1*1 is required
-                elif stride == 1 and is_conv_res:
-                    output_channel = depth_wise_ops.get_shape().as_list()[-1]
-                    output = slim.conv2d(input_x, output_channel, 1, 1, activation_fn=None) + depth_wise_ops
-                else:
-                    output = depth_wise_ops
+            else:
+                output = depth_wise_ops
 
             return output
 
-    def mobilenet_v2(self, input_x, is_training=True, reuse=False, keep_prob=0.5, scope='mobilenet_v2'):
+    def mobilenet_v2(self, input_x, is_training=True, reuse=False, keep_prob=0.8, scope='mobilenet_v2'):
         # batch_norm parameters
-        # bn_parameters = {'is_training': is_training, 'center':True, 'scale':True, 'decay':0.99, 'epsilon':0.001, 'zero_debias_moving_mean':False}
+        # bn_parameters = {'is_training': is_training, 'center':True, 'scale':True, 'decay':0.997}
         
         self.num_block = 0
         with tf.variable_scope(scope) as scope:
             if reuse:
                 scope.reuse_variables()
-            conv0 = slim.conv2d(input_x, 32, 3, stride=1, activation_fn=tf.nn.relu6,
-                                                          normalizer_fn=slim.batch_norm,
-                                                          #normalizer_params=bn_parameters,
-                                                          weights_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                                          scope='conv0')
-            # dropout
-            # dropout0 = slim.dropout(conv0, keep_prob = keep_prob)
-            # conv0_act = tf.nn.relu6(dropout0)
-            
-            # bottleneck_residual_block
-            bottleneck_1_1 = self.inverted_bottleneck_block(conv0, 1, 16, False, is_training=is_training)
-            bottleneck_2_1 = self.inverted_bottleneck_block(bottleneck_1_1, 6, 24, False, is_training=is_training)
-            bottleneck_2_2 = self.inverted_bottleneck_block(bottleneck_2_1, 6, 24, False, is_training=is_training)
-            bottleneck_3_1 = self.inverted_bottleneck_block(bottleneck_2_2, 6, 32, True, is_training=is_training)
-            bottleneck_3_2 = self.inverted_bottleneck_block(bottleneck_3_1, 6, 32, False, is_training=is_training)
-            bottleneck_3_3 = self.inverted_bottleneck_block(bottleneck_3_2, 6, 32, False, is_training=is_training)
-            bottleneck_4_1 = self.inverted_bottleneck_block(bottleneck_3_3, 6, 64, True, is_training=is_training)
-            bottleneck_4_2 = self.inverted_bottleneck_block(bottleneck_4_1, 6, 64, False, is_training=is_training)
-            bottleneck_4_3 = self.inverted_bottleneck_block(bottleneck_4_2, 6, 64, False, is_training=is_training)
-            bottleneck_4_4 = self.inverted_bottleneck_block(bottleneck_4_3, 6, 64, False, is_training=is_training)
-            bottleneck_5_1 = self.inverted_bottleneck_block(bottleneck_4_4, 6, 96, False, is_training=is_training)
-            bottleneck_5_2 = self.inverted_bottleneck_block(bottleneck_5_1, 6, 96, False, is_training=is_training)
-            bottleneck_5_3 = self.inverted_bottleneck_block(bottleneck_5_2, 6, 96, False, is_training=is_training)
-            bottleneck_6_1 = self.inverted_bottleneck_block(bottleneck_5_3, 6, 160, True, is_training=is_training)
-            bottleneck_6_2 = self.inverted_bottleneck_block(bottleneck_6_1, 6, 160, False, is_training=is_training)
-            bottleneck_6_3 = self.inverted_bottleneck_block(bottleneck_6_2, 6, 160, False, is_training=is_training)
-            bottleneck_7_1 = self.inverted_bottleneck_block(bottleneck_6_3, 6, 320, False, is_training=is_training)
-            
-            conv8 = slim.conv2d(bottleneck_7_1, 1280, 3, stride=1, activation_fn=tf.nn.relu6,
-                                                                   normalizer_fn=slim.batch_norm,
-                                                                   #normalizer_params=bn_parameters,
-                                                                   weights_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                                                   scope='conv8')
-            # dropout1 = slim.dropout(conv8, keep_prob=keep_prob)
-            # conv8_act = tf.nn.relu6(dropout1)
-            
-            # global average pooling
-            # dropout2 = slim.dropout(conv8, keep_prob=keep_prob)
-            filter_size = [conv8.get_shape().as_list()[1], conv8.get_shape().as_list()[2]]
-            avgpool = slim.avg_pool2d(conv8, filter_size, scope='avgpool')
-            dropout3 = slim.dropout(avgpool, keep_prob=keep_prob)
-            
-            output = tf.squeeze(slim.conv2d(dropout3, self.num_class, 1, stride=1, activation_fn=None,
-                                                                                   weights_initializer=tf.truncated_normal_initializer(stddev=0.02)))
-            return output
+
+            with slim.arg_scope([slim.conv2d, slim.separable_conv2d], weights_initializer=tf.truncated_normal_initializer(stddev=0.02),
+                                                                      normalizer_fn=slim.batch_norm,
+                                                                      #normalizer_params=bn_parameters,
+                                                                      activation_fn=tf.nn.relu6),\
+                    slim.arg_scope([slim.dropout], keep_prob=keep_prob) as s:
+
+                conv0 = slim.conv2d(input_x, 32, 3, stride=1, scope='conv0')
+                
+                # bottleneck_residual_block
+                bottleneck_1_1 = self.inverted_bottleneck_block(conv0, 1, 16, False, is_training=is_training)
+                bottleneck_2_1 = self.inverted_bottleneck_block(bottleneck_1_1, self.width_multiplier, 24, False, is_training=is_training)
+                bottleneck_2_2 = self.inverted_bottleneck_block(bottleneck_2_1, self.width_multiplier, 24, False, is_training=is_training)
+                bottleneck_3_1 = self.inverted_bottleneck_block(bottleneck_2_2, self.width_multiplier, 32, True, is_training=is_training)
+                bottleneck_3_2 = self.inverted_bottleneck_block(bottleneck_3_1, self.width_multiplier, 32, False, is_training=is_training)
+                bottleneck_3_3 = self.inverted_bottleneck_block(bottleneck_3_2, self.width_multiplier, 32, False, is_training=is_training)
+                bottleneck_4_1 = self.inverted_bottleneck_block(bottleneck_3_3, self.width_multiplier, 64, True, is_training=is_training)
+                bottleneck_4_2 = self.inverted_bottleneck_block(bottleneck_4_1, self.width_multiplier, 64, False, is_training=is_training)
+                bottleneck_4_3 = self.inverted_bottleneck_block(bottleneck_4_2, self.width_multiplier, 64, False, is_training=is_training)
+                bottleneck_4_4 = self.inverted_bottleneck_block(bottleneck_4_3, self.width_multiplier, 64, False, is_training=is_training)
+                bottleneck_5_1 = self.inverted_bottleneck_block(bottleneck_4_4, self.width_multiplier, 96, False, is_training=is_training)
+                bottleneck_5_2 = self.inverted_bottleneck_block(bottleneck_5_1, self.width_multiplier, 96, False, is_training=is_training)
+                bottleneck_5_3 = self.inverted_bottleneck_block(bottleneck_5_2, self.width_multiplier, 96, False, is_training=is_training)
+                bottleneck_6_1 = self.inverted_bottleneck_block(bottleneck_5_3, self.width_multiplier, 160, True, is_training=is_training)
+                bottleneck_6_2 = self.inverted_bottleneck_block(bottleneck_6_1, self.width_multiplier, 160, False, is_training=is_training)
+                bottleneck_6_3 = self.inverted_bottleneck_block(bottleneck_6_2, self.width_multiplier, 160, False, is_training=is_training)
+                bottleneck_7_1 = self.inverted_bottleneck_block(bottleneck_6_3, self.width_multiplier, 320, False, is_training=is_training)
+                
+                conv8 = slim.conv2d(bottleneck_7_1, 1280, 3, stride=1, scope='conv8')
+                
+                # global average pooling
+                filter_size = [conv8.get_shape().as_list()[1], conv8.get_shape().as_list()[2]]
+                avgpool = slim.avg_pool2d(conv8, filter_size, scope='avgpool')
+                dropout = slim.dropout(avgpool)
+                
+                logits = tf.squeeze(slim.conv2d(dropout, self.num_class, 1, stride=1, activation_fn=None,
+                                                                                       normalizer_fn=None))
+            return logits
             
     def build_model(self):
         # classicification task
@@ -199,14 +191,9 @@ class MobileNet_V2:
             if np.mod(ite, ites_per_epoch) == 0:
                 # learning rate decay
                 # learning_rate = learning_rate*self.config.learning_rate_decay
-                self.test_model()
-                '''
-                pred_softmax = self.pred_softmax.eval({self.input_x:images, self.input_label:labels})
-                correct = np.sum(np.equal(np.argmax(labels, 1), np.argmax(pred_softmax, 1)).astype(np.float32))
-                print('correct_rate:{:.4f}'.format(correct/self.batchsize))
-                '''
+                self.test_model(int(ite/ites_per_epoch))
             
-            if np.mod(ite, 1000)==0:
+            if np.mod(ite, 10*ites_per_epoch)==0:
                 self.save_model()
 
     @property
@@ -229,7 +216,7 @@ class MobileNet_V2:
             self.saver.restore(self.sess, self.model_pos)
             return True
 
-    def test_model(self):        
+    def test_model(self, epochs):        
         # initialize variables
         if not self.config.is_training:
             tf.global_variables_initializer().run()
@@ -247,14 +234,12 @@ class MobileNet_V2:
         correct_num = 0
         for ite in range(ites):
             images, labels = next(gen_data)
-            # normalize images
-            # images = (images - 127.5)/127.5
             pred_softmax = self.sess.run([self.pred_softmax], feed_dict={self.input_x:images})
             correct = np.sum(np.equal(np.argmax(labels, 1), np.argmax(pred_softmax[0], 1)).astype(np.float32))
             correct_num = correct_num + correct
         
         correct_rate = float(correct_num)/float(ites*self.batchsize)
-        print('correct rate:{:.4f}'.format(correct_rate))
+        print('test-epochs {}: -- accuracy:{:.4f} --'.format(epochs, correct_rate))
 
 if __name__=='__main__':
     input_x = tf.Variable(tf.random_normal([64,224,224,3]), dtype=tf.float32, name='input')
